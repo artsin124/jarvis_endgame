@@ -23,5 +23,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
     4. Save the turn using conversation_store.append_turn().
     5. Return ChatResponse(sessionId, reply, turnsRetained).
     """
-    # Fill here using the workshop prompt
-    pass
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Text cannot be blank")
+        
+    try:
+        history = conversation_store.history(request.session_id)
+        reply = await asyncio.to_thread(generate_reply, history, text)
+        turns = conversation_store.append_turn(request.session_id, text, reply)
+        
+        return ChatResponse(
+            sessionId=request.session_id,
+            reply=reply,
+            turnsRetained=turns
+        )
+    except GroqChatError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))

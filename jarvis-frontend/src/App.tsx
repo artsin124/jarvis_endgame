@@ -34,7 +34,7 @@ function defaultPanelPositions() {
 export function App() {
   const panelPositions = useRef(defaultPanelPositions());
   const sessionId = useRef(crypto.randomUUID());
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | AudioBufferSourceNode | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -132,10 +132,22 @@ export function App() {
     if (DEMO_MODE && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    audioRef.current?.pause();
+    if (audioRef.current) {
+      if ("pause" in audioRef.current) {
+        audioRef.current.pause();
+      } else {
+        (audioRef.current as AudioBufferSourceNode).stop();
+      }
+    }
     audioRef.current = null;
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     audioUrlRef.current = null;
+    if (!streamRef.current && audioContextRef.current) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      void audioContextRef.current.close();
+      audioContextRef.current = null;
+      setLevel(0);
+    }
   }
 
   function stopCapture() {
@@ -175,15 +187,39 @@ export function App() {
     }
     try {
       stopSpeech();
-      const url = URL.createObjectURL(await requestSpeech(text, voiceId));
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audioUrlRef.current = url;
-      audio.onended = () => {
-        if (audioUrlRef.current === url) URL.revokeObjectURL(url);
+      const blob = await requestSpeech(text, voiceId);
+      const arrayBuffer = await blob.arrayBuffer();
+      const context = new AudioContext();
+      audioContextRef.current = context;
+      const audioBuffer = await context.decodeAudioData(arrayBuffer);
+      const source = context.createBufferSource();
+      source.buffer = audioBuffer;
+      audioRef.current = source;
+      
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyser.connect(context.destination);
+
+      const samples = new Uint8Array(analyser.fftSize);
+      const updateMeter = () => {
+        analyser.getByteTimeDomainData(samples);
+        const mean = samples.reduce((sum, sample) => sum + Math.abs(sample - 128), 0) / samples.length;
+        setLevel(Math.min(1, mean / 26));
+        animationRef.current = requestAnimationFrame(updateMeter);
+      };
+      updateMeter();
+
+      source.onended = () => {
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        void context.close();
+        audioContextRef.current = null;
         setStatus("idle");
       };
-      await audio.play();
+      source.start();
+      if (context.state === "suspended") {
+        await context.resume();
+      }
       setTtsState("ready");
       setStatus("speaking");
     } catch (reason) {
@@ -430,7 +466,7 @@ export function App() {
       <video className="background-video" autoPlay muted loop playsInline preload="auto" aria-hidden="true">
         <source src={cyberpunkBackgroundVideo} type="video/mp4" />
       </video>
-      <AmbientHud active={active} level={status === "listening" ? level : status === "speaking" ? 0.72 : 0.35} />
+      <AmbientHud status={status} level={status === "listening" || status === "speaking" ? level : 0.35} />
       <MovablePanel id="orb" label="Jarvis voice orb" className="orb-panel" defaultPosition={panelPositions.current.orb}>
         <OrbControl
           disabled={status === "thinking" || backendStarting}

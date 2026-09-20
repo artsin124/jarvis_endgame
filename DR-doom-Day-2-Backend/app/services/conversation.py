@@ -31,17 +31,24 @@ class ConversationStore:
         TODO: Return past messages for this session in OpenAI format:
         [{"role": "user"|"assistant", "content": "..."}]
         """
-        # Fill here using the workshop prompt
-        pass
-
+        with self._lock:
+            messages = self._sessions.get(session_id, deque())
+            return [{"role": m.role, "content": m.content} for m in messages]
     def append_turn(self, session_id: UUID, user_text: str, assistant_text: str) -> int:
         """
         TODO: Store user message + assistant reply in a deque(maxlen=12).
         Retain max 6 turns. Return len(messages) // 2.
         """
-        # Fill here using the workshop prompt
-        pass
-
+        with self._lock:
+            if session_id not in self._sessions:
+                if len(self._sessions) >= MAX_ACTIVE_SESSIONS:
+                    self._sessions.popitem(last=False)
+                self._sessions[session_id] = deque(maxlen=MAX_TURNS * 2)
+            
+            queue = self._sessions[session_id]
+            queue.append(Message(role="user", content=user_text))
+            queue.append(Message(role="assistant", content=assistant_text))
+            return len(queue) // 2
     def clear(self, session_id: UUID) -> None:
         """Clear memory for a session."""
         with self._lock:

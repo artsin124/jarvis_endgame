@@ -19,7 +19,7 @@ export function ActivityMonitor({ state }: ActivityMonitorProps) {
       <ol>
         {activity.entries.map((entry) => <li key={entry}>{entry}</li>)}
       </ol>
-      <p>RIGHT-CLICK THIS PANEL TO MOVE</p>
+      <p>DRAG THIS PANEL TO MOVE</p>
     </aside>
   );
 }

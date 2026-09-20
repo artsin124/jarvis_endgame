@@ -1392,9 +1392,9 @@ h1 {
 }
 
 .signal-line {
-  stroke: url(#signal-grad);
-  stroke-width: 3;
-  stroke-linecap: round;
+  stroke: #ff0055;
+  stroke-width: 6;
+  stroke-linecap: butt;
   transform-origin: center 146px;
   transform: scaleY(0.28);
   opacity: 0.45;
@@ -1406,8 +1406,8 @@ h1 {
   opacity: 0.98;
   animation-name: signal-active;
   animation-duration: calc(1.15s - var(--audio-level, 0.3) * 0.75s);
-  stroke-width: calc(2.8px + var(--audio-level, 0.3) * 3.5px);
-  filter: drop-shadow(0 0 10px #00f0ff);
+  stroke-width: calc(6px + var(--audio-level, 0.3) * 2px);
+  filter: drop-shadow(0 0 10px #ff0055);
 }
 
 .hud-caption {

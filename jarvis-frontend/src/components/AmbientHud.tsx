@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-type AmbientHudProps = { active: boolean; level: number };
+type AmbientHudProps = { status: string; level: number };
 
 const signalLines = Array.from({ length: 32 }, (_, index) => {
   const progress = index / 31;
@@ -13,7 +13,13 @@ const signalLines = Array.from({ length: 32 }, (_, index) => {
   };
 });
 
-export function AmbientHud({ active, level }: AmbientHudProps) {
+export function AmbientHud({ status, level }: AmbientHudProps) {
+  const active = status === "listening" || status === "thinking" || status === "speaking";
+  let label = "AUDIO LINK / STANDBY";
+  if (status === "listening") label = "AUDIO LINK / ACTIVE CAPTURE";
+  else if (status === "speaking") label = "AUDIO LINK / RESPONDING";
+  else if (status === "thinking") label = "AUDIO LINK / PROCESSING";
+
   return (
     <div
       className={`ambient-hud ${active ? "is-active" : ""}`}
@@ -77,7 +83,7 @@ export function AmbientHud({ active, level }: AmbientHudProps) {
 
         <div className="hud-caption">
           <span className="hud-status-dot" />
-          <span>{active ? "AUDIO LINK // ACTIVE CAPTURE" : "AUDIO LINK // TELEMETRY STANDBY"}</span>
+          <span>{label}</span>
         </div>
       </div>
     </div>

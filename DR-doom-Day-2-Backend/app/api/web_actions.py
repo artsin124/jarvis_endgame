@@ -15,5 +15,5 @@ async def plan_web_action(request: WebActionPlanRequest) -> WebActionPlanRespons
     TODO (Phase 4 - Step 9):
     Return planned destination URL for frontend user confirmation.
     """
-    # Fill here using the workshop prompt
-    pass
+    plan = make_web_action_plan(request.text)
+    return WebActionPlanResponse(**plan)

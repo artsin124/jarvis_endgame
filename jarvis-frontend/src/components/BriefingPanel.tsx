@@ -30,6 +30,12 @@ export function BriefingPanel() {
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    // Auto-fetch if permission was already granted
+    navigator.permissions?.query({ name: "geolocation" }).then((result) => {
+      if (result.state === "granted") {
+        shareLocation();
+      }
+    });
     return () => window.clearInterval(timer);
   }, []);
 
