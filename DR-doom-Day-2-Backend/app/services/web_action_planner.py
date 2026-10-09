@@ -20,6 +20,28 @@ file path, app name, or explanation."""
 # ==============================================================================
 # PHASE 4: THE HANDS (Safe Web Action Destination Planner)
 # ==============================================================================
+def _model_classification(text: str) -> dict | None:
+    headers = {
+        "Authorization": f"Bearer {settings.groq_api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": settings.groq_chat_model,
+        "messages": [
+            {"role": "system", "content": PLANNER_PROMPT},
+            {"role": "user", "content": text}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0
+    }
+    
+    resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data, timeout=5)
+    resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
 def make_web_action_plan(text: str) -> dict[str, str]:
     """
     TODO (Phase 4 - Step 9):
@@ -31,12 +53,14 @@ def make_web_action_plan(text: str) -> dict[str, str]:
     """
     text_stripped = text.strip()
     
-    parsed = urlparse(text_stripped)
-    if parsed.scheme in ("http", "https") and parsed.netloc:
+    url_match = re.search(r'(https?://[^\s]+)', text_stripped)
+    if url_match:
+        url = url_match.group(1)
+        parsed = urlparse(url)
         return {
             "kind": "open_website",
-            "label": f"Open {parsed.netloc}",
-            "url": text_stripped
+            "label": parsed.netloc,
+            "url": url
         }
         
     if re.match(r"^[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+(/[^\s]*)?$", text_stripped):
@@ -44,35 +68,28 @@ def make_web_action_plan(text: str) -> dict[str, str]:
         parsed = urlparse(url)
         return {
             "kind": "open_website",
-            "label": f"Open {parsed.netloc}",
+            "label": parsed.netloc,
             "url": url
         }
 
-    headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "model": settings.groq_chat_model,
-        "messages": [
-            {"role": "system", "content": PLANNER_PROMPT},
-            {"role": "user", "content": text_stripped}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0
-    }
-    
     try:
-        resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data, timeout=5)
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-        plan = json.loads(content)
+        plan = _model_classification(text_stripped)
+        if plan is None:
+            raise ValueError("Mocked")
         kind = plan.get("kind", "web_search")
         query = plan.get("query", text_stripped)
     except Exception:
-        kind = "web_search"
-        query = text_stripped
+        text_lower = text_stripped.lower()
+        if "youtube" in text_lower:
+            kind = "youtube_search"
+            # Simple extraction for fallback
+            query = re.sub(r'(?i)play|on youtube|search for', '', text_stripped).strip()
+        elif "spotify" in text_lower:
+            kind = "spotify_search"
+            query = re.sub(r'(?i)play|on spotify|search for', '', text_stripped).strip()
+        else:
+            kind = "web_search"
+            query = text_stripped
         
     if kind == "youtube_search":
         url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
